@@ -17,6 +17,7 @@ import 'package:zulip/log.dart';
 import 'package:zulip/model/actions.dart';
 import 'package:zulip/model/store.dart';
 import 'package:zulip/notifications/receive.dart';
+import 'package:zulip/model/binding.dart';
 
 import '../api/fake_api.dart';
 import '../api/model/model_checks.dart';
@@ -1177,6 +1178,7 @@ void main() {
       // When the token later appears, send it.
       connection.prepare(json: {});
       await startFuture;
+      async.flushMicrotasks();
       if (defaultTargetPlatform == TargetPlatform.android) {
         checkLastRequestFcm(token: '012abc');
       } else {
@@ -1189,6 +1191,24 @@ void main() {
         connection.prepare(json: {});
         async.flushMicrotasks();
         checkLastRequestFcm(token: '456def');
+      }
+    }));
+
+    testAndroidIos('use provided appId from packageInfo', () => awaitFakeAsync((async) async {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        addTearDown(testBinding.reset);
+        testBinding.firebaseMessagingInitialToken = '012abc';
+        testBinding.packageInfoResult = PackageInfo(
+          version: '1.0.0',
+          buildNumber: '1',
+          packageName: 'com.example.test',
+        );
+        addTearDown(NotificationService.debugReset);
+        await NotificationService.instance.start();
+        prepareStore();
+        connection.prepare(json: {});
+        await updateMachine.registerNotificationToken();
+        checkLastRequestApns(token: '012abc', appid: 'com.example.test');
       }
     }));
   });
